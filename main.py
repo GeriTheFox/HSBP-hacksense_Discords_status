@@ -1,38 +1,39 @@
-from discord.ext import tasks
-import discord
+import redis
 import requests
 import json
-from decouple import config
+
+db = 'localhost'
+db_port = 6379
+
+
+def voice_name_edit(channel_id, name) :
+    r = redis.Redis(host=db, port=db_port, db=2)
+    r.set(channel_id, name)
+
+
+url = "https://vsza.hu/hacksense/status.json"
+headers = {"User-Agent": "aRandomUserAgenttoMakeTheApiHappy"}
+response = requests.get(url, headers=headers)
+data = json.loads(response.content.decode('utf-8'))
+
+cache = redis.Redis(host=db, port=db_port, db=3)
+
+
+if (str(data['what']) != cache.get("hacksense").decode('utf-8')):
+    state = str(data['what'])
+    cache.set('hacksense', state )
+    if data['what'] == True:
+        voice_name_edit('998622942957150301','space-is-OPEN')
+    else:
+        voice_name_edit('998622942957150301','space-is-CLOSED')
 
 
 
-class MyClient(discord.Client):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.my_background_task.start()
-
-    async def on_ready(self):
-        print('We have logged in as {0.user}'.format(client))
-
-    @tasks.loop(seconds=60)
-    async def my_background_task(self):
-        channel = client.get_channel(config('CHANNEL_ID'))
-        url = "https://vsza.hu/hacksense/status.json"
-        headers = {"User-Agent": "aRandomUserAgenttoMakeTheApiHappy"}
-        response = requests.get(url, headers=headers)
-        data = json.loads(response.content.decode('utf-8'))
-        #print(data)
-        if data['what'] == True:
-            await discord.VoiceChannel.edit(channel, name = 'space-is-OPEN')
-        else:
-            await discord.VoiceChannel.edit(channel, name = 'space-is-CLOSED')
-
-
-    @my_background_task.before_loop
-    async def before_my_task(self):
-        await self.wait_until_ready()
-
-client = MyClient()
-
-client.run(config('DISCORD_TOKEN'))
-
+# the channel edids pulled from db, by crow bot
+#@tasks.loop(seconds=30)
+#async def edit_vchannel_name():
+#    r = redis.Redis(host=db, port=db_port, db=2)
+#    for key in r.keys('*'):
+#        cahnnel_id = key.decode("utf-8")
+#        channel = client.get_channel(int(cahnnel_id))
+#        await discord.VoiceChannel.edit(channel, name = r.getdel(key).decode("utf-8"))
